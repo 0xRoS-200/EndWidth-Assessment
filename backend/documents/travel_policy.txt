@@ -1,0 +1,26 @@
+# Business Travel Policy
+
+## Overview
+This policy governs all travel undertaken by employees on behalf of the company. All business travel must be pre-approved before bookings are made.
+
+## Approval Process
+1. Submit a travel request in the HR portal at least 5 working days before the intended departure date.
+2. Include the purpose of travel, destination, estimated cost, and duration.
+3. Approval is required from both the direct manager and the Finance team for trips exceeding INR 50,000.
+
+## Booking
+- All flights and hotels must be booked through the company's approved travel vendor (MakeMyTrip Business Account).
+- Economy class is the default for flights under 6 hours. Business class may be approved for flights over 6 hours or for senior management.
+- Hotel bookings should not exceed INR 5,000 per night in Tier-1 cities and INR 3,000 per night in other locations.
+
+## Daily Allowance (Per Diem)
+- Domestic travel: INR 1,500 per day for meals and local transport.
+- International travel: USD 80 per day.
+- Per diem is paid as a flat allowance and does not require receipts.
+
+## Reimbursement
+- Expenses beyond the per diem (e.g., client dinner) must be supported by original receipts and submitted within 7 working days of returning.
+- Reimbursement requests are processed within 10 working days of submission.
+
+## Personal Travel Extensions
+Employees may extend a business trip for personal travel at their own cost, but the return date must be clearly marked as personal and not claimed for reimbursement.

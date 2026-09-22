@@ -1,0 +1,29 @@
+# Leave Policy
+
+## Overview
+All full-time employees are entitled to paid leave as described in this policy. Leave must be applied for in advance through the HR portal and approved by the employee's direct manager.
+
+## Annual Leave Entitlement
+Every employee receives 18 days of paid annual leave per calendar year. Leave is accrued at 1.5 days per month starting from the employee's joining date.
+
+## Carry-Forward Rules
+Up to 5 unused leave days may be carried forward to the next calendar year. Any unused leave beyond 5 days will lapse at year-end and cannot be encashed.
+
+## Leave Application Process
+1. Log in to the HR portal at hr.company.internal.
+2. Submit a leave request at least 3 working days in advance for planned leave.
+3. Your direct manager will approve or reject the request within 2 working days.
+4. Emergency leave may be applied on the same day with a message to your manager.
+
+## Types of Leave
+- **Casual Leave**: 6 days per year, for personal errands or short breaks.
+- **Sick Leave**: 10 days per year, requires a medical certificate for more than 2 consecutive days.
+- **Maternity/Paternity Leave**: 26 weeks for primary caregiver, 5 days for secondary caregiver.
+- **Bereavement Leave**: 3 days for immediate family members.
+
+## Leave Balance
+Employees can check their current leave balance any time in the HR portal or by asking the Employee Assistant.
+
+## Restrictions
+- Leave cannot be taken during a critical project deadline period without explicit manager approval.
+- No more than 10 consecutive days of annual leave without HR Director approval.

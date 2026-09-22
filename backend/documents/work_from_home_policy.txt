@@ -1,0 +1,25 @@
+# Work From Home Policy
+
+## Overview
+The company supports flexible working arrangements. Employees may work from home subject to the conditions described in this policy.
+
+## WFH Entitlement
+Employees are permitted to work from home for a maximum of 2 days per week. The specific days must be agreed upon with the employee's direct manager at the start of each month.
+
+## WFH Restrictions
+- **Mondays are mandatory office days.** All employees must be present in the office every Monday regardless of their WFH arrangement.
+- Employees on probation (first 6 months) are not eligible for WFH and must be in the office 5 days a week.
+- WFH is not permitted on days when the employee has scheduled in-person meetings, client visits, or all-hands sessions.
+
+## Approval Process
+1. Discuss your preferred WFH days with your manager before the start of each month.
+2. Once agreed, update your calendar and notify your team.
+3. Ad-hoc WFH requests (e.g., due to a delivery or home repair) require a Slack message to your manager by 8:00 AM that day.
+
+## Equipment and Connectivity
+- Employees are responsible for maintaining a stable internet connection while working from home.
+- Company-issued laptops must be used for all work. Personal devices may not be used to access company systems unless approved by IT.
+- VPN must be active whenever accessing internal company resources remotely.
+
+## Accountability
+Employees working from home are expected to maintain the same working hours and responsiveness as when in the office. Attendance at online stand-ups and video calls is mandatory during WFH days.

@@ -1,0 +1,31 @@
+# IT and Security Policy
+
+## Overview
+This policy sets out the rules for using company IT systems and handling company data. Compliance is mandatory for all employees, contractors, and interns.
+
+## Acceptable Use
+- Company devices (laptops, phones, tablets) are provided for business use. Limited personal use is permitted, provided it does not interfere with work or violate any other policy.
+- Accessing, storing, or sharing illegal content on company devices is strictly prohibited.
+- Employees must not install unlicensed software on company devices.
+
+## Password Policy
+- All account passwords must be at least 12 characters and include uppercase letters, lowercase letters, numbers, and special characters.
+- Passwords must be changed every 90 days.
+- Do not reuse any of the last 10 passwords.
+- Multi-factor authentication (MFA) is mandatory for all company accounts including email, HR portal, and code repositories.
+
+## Data Handling
+- Confidential company data must not be stored on personal devices or personal cloud storage (e.g., personal Google Drive, Dropbox).
+- Customer data is classified as "Restricted" and must only be accessed on a need-to-know basis.
+- All data transfers outside the company network must use encrypted channels (HTTPS, SFTP, or VPN).
+
+## Remote Access
+- VPN must be used when accessing internal systems from outside the office network.
+- Employees must lock their screen when stepping away from their workstation, especially in public spaces.
+
+## Incident Reporting
+Any suspected security incident, data breach, or lost/stolen device must be reported to IT Security (security@company.internal) within 1 hour of discovery.
+
+## Software Updates
+- Operating system and security patches must be applied within 48 hours of release.
+- The IT team may push updates remotely; employees must not defer these updates.

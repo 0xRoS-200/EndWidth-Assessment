@@ -1,0 +1,45 @@
+# Company FAQ
+
+## General
+
+### What are the office hours?
+Standard office hours are 9:00 AM to 6:00 PM, Monday to Friday. Employees on flexible working arrangements should agree their core hours with their manager.
+
+### How many paid leave days do employees get per year?
+Employees are entitled to 18 paid leave days every year. This includes both casual and privilege leave combined. New joiners accrue leave at 1.5 days per month from their start date.
+
+### Can I work from home?
+Yes. The company allows up to two work-from-home days per week. Mondays are mandatory office days for all employees. WFH arrangements should be agreed with your manager at the start of each month.
+
+### How do I apply for leave?
+Log in to the HR portal and submit a leave request at least 3 working days in advance. Your manager will approve or reject it within 2 working days. For emergencies, notify your manager directly on the same day.
+
+### What happens to unused leave at year end?
+You can carry forward a maximum of 5 unused leave days to the next year. Anything beyond 5 days lapses and cannot be encashed.
+
+## Benefits
+
+### Does the company provide health insurance?
+Yes. All full-time employees and their immediate family (spouse and up to 2 children) are covered under the company's group health insurance plan up to INR 5,00,000 per year.
+
+### Is there a gym allowance?
+Yes. Employees receive INR 1,500 per month as a wellness allowance for gym memberships or fitness activities.
+
+### Does the company offer pet insurance?
+No. Pet insurance is not included in the employee benefits package. Only health, dental, vision, life insurance, and wellness allowances are provided.
+
+## IT
+
+### What should I do if I lose my company laptop?
+Report the loss to IT Security (security@company.internal) immediately, within 1 hour of discovering the loss. IT will remotely wipe the device.
+
+### Can I use personal devices for work?
+No. Personal devices may not be used to access company systems unless specifically approved by the IT department.
+
+## Payroll
+
+### When is salary credited?
+Salaries are credited on the last working day of each month directly to the bank account registered in the HR portal.
+
+### How do I update my bank account details?
+Log in to the HR portal, navigate to My Profile > Bank Details, and submit a change request. Changes take effect from the next payroll cycle.
