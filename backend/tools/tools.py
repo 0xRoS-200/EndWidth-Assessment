@@ -10,6 +10,9 @@ from datetime import datetime, date
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import EMPLOYEES_PATH
+from logger import get_logger
+
+log = get_logger("tools")
 
 # ---------------------------------------------------------------------------
 # Employee data — loaded once, kept in memory (changes survive the session)
@@ -36,16 +39,20 @@ def search_company_documents(query: str) -> dict:
 # ---------------------------------------------------------------------------
 def get_employee_info(employee_id: str) -> dict:
     """Return employee details. Returns an error dict if the ID is unknown."""
+    log.info("get_employee_info | employee_id=%s", employee_id)
     emp = _EMPLOYEES.get(employee_id.upper())
     if not emp:
+        log.warning("get_employee_info | unknown employee: %s", employee_id)
         return {"error": f"Employee ID '{employee_id}' not found."}
-    return {
+    result = {
         "employee_id": employee_id.upper(),
         "name": emp["name"],
         "department": emp["department"],
         "role": emp["role"],
         "leave_balance": emp["leave_balance"],
     }
+    log.info("get_employee_info | result: name=%s, balance=%d", emp["name"], emp["leave_balance"])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -56,32 +63,35 @@ def apply_leave(employee_id: str, start_date: str, end_date: str, reason: str) -
     Apply leave for an employee. Validates dates and balance, then deducts.
     Dates must be in YYYY-MM-DD format.
     """
+    log.info(
+        "apply_leave | emp=%s, start=%s, end=%s, reason=%r",
+        employee_id, start_date, end_date, reason[:40],
+    )
     emp_id = employee_id.upper()
     emp = _EMPLOYEES.get(emp_id)
     if not emp:
+        log.warning("apply_leave | unknown employee: %s", employee_id)
         return {"status": "failure", "message": f"Employee ID '{employee_id}' not found."}
 
-    # Parse dates
     try:
         start = datetime.strptime(start_date, "%Y-%m-%d").date()
         end = datetime.strptime(end_date, "%Y-%m-%d").date()
     except ValueError:
+        log.warning("apply_leave | invalid date format: start=%s end=%s", start_date, end_date)
         return {"status": "failure", "message": "Invalid date format. Use YYYY-MM-DD."}
 
     if end < start:
+        log.warning("apply_leave | end date before start date")
         return {"status": "failure", "message": "End date cannot be before start date."}
 
-    # Count business days (Mon–Fri)
-    days_requested = sum(
-        1 for i in range((end - start).days + 1)
-        if (start.toordinal() + i) % 7 not in (6, 0)  # 6=Sat, 0=Sun in Python's weekday
-    )
-
-    # Simpler: count all calendar days inclusive (assessment uses calendar days)
     days_requested = (end - start).days + 1
 
     balance = emp["leave_balance"]
     if days_requested > balance:
+        log.warning(
+            "apply_leave | insufficient balance: requested=%d, available=%d",
+            days_requested, balance,
+        )
         return {
             "status": "failure",
             "message": (
@@ -90,9 +100,11 @@ def apply_leave(employee_id: str, start_date: str, end_date: str, reason: str) -
             ),
         }
 
-    # Deduct from in-memory store
     _EMPLOYEES[emp_id]["leave_balance"] -= days_requested
-
+    log.info(
+        "apply_leave | success: %s, days=%d, new_balance=%d",
+        emp["name"], days_requested, _EMPLOYEES[emp_id]["leave_balance"],
+    )
     return {
         "status": "success",
         "message": (

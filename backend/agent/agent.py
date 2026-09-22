@@ -1,6 +1,7 @@
 """
 Agentic loop: routes user messages to tools via Gemini function calling.
 Maintains per-session conversation history.
+Bonus: structured logging, SSE streaming generator.
 """
 import json
 import os
@@ -16,6 +17,9 @@ from google.generativeai.types import FunctionDeclaration, Tool
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from tools.tools import TOOL_REGISTRY, TOOL_DESCRIPTIONS
+from logger import get_logger
+
+log = get_logger("agent")
 
 genai.configure(api_key=GEMINI_API_KEY)
 
@@ -61,17 +65,35 @@ def _build_system_prompt(employee_id: str) -> str:
 def _trim_history(session_id: str):
     """Keep only the last MAX_HISTORY_PAIRS conversation turns."""
     history = _history[session_id]
-    # Each turn = 1 user message + 1 model message (2 entries)
     max_entries = MAX_HISTORY_PAIRS * 2
     if len(history) > max_entries:
         _history[session_id] = history[-max_entries:]
 
 
+def _execute_tool(fn_name: str, fn_args: dict, employee_id: str) -> dict:
+    """Run a single tool and return its result dict."""
+    # Security: enforce authenticated employee_id for leave actions
+    if fn_name == "apply_leave":
+        fn_args["employee_id"] = employee_id
+
+    tool_fn = TOOL_REGISTRY.get(fn_name)
+    if tool_fn is None:
+        log.warning("Unknown tool requested: %s", fn_name)
+        return {"error": f"Unknown tool: {fn_name}"}
+
+    log.info("Executing tool: %s | args: %s", fn_name, {k: v for k, v in fn_args.items() if k != "employee_id"})
+    result = tool_fn(**fn_args)
+    log.info("Tool %s result: %s", fn_name, str(result)[:120])
+    return result
+
+
 def chat(employee_id: str, message: str, session_id: str) -> dict:
     """
     Run the agentic loop for one user message.
-    Returns: {answer, sources, tools_called}
+    Returns: {answer, sources, tools_used}
     """
+    log.info("chat() | session=%s | emp=%s | msg=%r", session_id[:8], employee_id, message[:80])
+
     tools = _build_tools()
     model = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
@@ -79,52 +101,38 @@ def chat(employee_id: str, message: str, session_id: str) -> dict:
         system_instruction=_build_system_prompt(employee_id),
     )
 
-    # Append the new user message to session history
     _history[session_id].append({"role": "user", "parts": [message]})
     _trim_history(session_id)
 
-    # Start a chat with the existing history (excluding the message we just added,
-    # since we'll send it as the next turn)
-    history_for_chat = _history[session_id][:-1]  # everything before the current message
+    history_for_chat = _history[session_id][:-1]
     convo = model.start_chat(history=history_for_chat)
 
     tools_used = []
     all_sources = []
     final_answer = ""
-
     current_message = message
 
     for iteration in range(MAX_ITERATIONS):
+        log.debug("Agent iteration %d/%d", iteration + 1, MAX_ITERATIONS)
         response = convo.send_message(current_message)
         candidate = response.candidates[0]
         parts = candidate.content.parts
 
-        # Check if the model wants to call a function
         fn_calls = [p for p in parts if hasattr(p, "function_call") and p.function_call.name]
 
         if not fn_calls:
-            # Model gave a text response — we're done
             final_answer = "".join(p.text for p in parts if hasattr(p, "text")).strip()
+            log.info("Agent finished | answer_len=%d | tools=%s", len(final_answer), tools_used)
             break
 
-        # Execute each requested tool call
         tool_results = []
         for part in fn_calls:
             fn_name = part.function_call.name
             fn_args = dict(part.function_call.args)
-
-            # Security: enforce that apply_leave always uses the authenticated employee_id
-            if fn_name == "apply_leave":
-                fn_args["employee_id"] = employee_id
-
             tools_used.append(fn_name)
-            tool_fn = TOOL_REGISTRY.get(fn_name)
-            if tool_fn is None:
-                result = {"error": f"Unknown tool: {fn_name}"}
-            else:
-                result = tool_fn(**fn_args)
 
-            # Collect sources from document search
+            result = _execute_tool(fn_name, fn_args, employee_id)
+
             if fn_name == "search_company_documents" and "sources" in result:
                 all_sources.extend(result.get("sources", []))
 
@@ -135,25 +143,122 @@ def chat(employee_id: str, message: str, session_id: str) -> dict:
                 }
             })
 
-        # Feed all tool results back in one message
         current_message = tool_results
 
     else:
-        # Loop limit reached — ask model to summarise what it has so far
+        log.warning("Agent hit max iterations (%d) — requesting summary.", MAX_ITERATIONS)
         response = convo.send_message("Please summarise what you have found so far.")
         final_answer = response.text.strip()
 
-    # Append assistant turn to history
     _history[session_id].append({"role": "model", "parts": [final_answer]})
     _trim_history(session_id)
 
     return {
         "answer": final_answer,
         "sources": list(set(all_sources)),
-        "tools_used": list(dict.fromkeys(tools_used)),  # deduplicated, order-preserved
+        "tools_used": list(dict.fromkeys(tools_used)),
     }
+
+
+def chat_stream(employee_id: str, message: str, session_id: str):
+    """
+    Streaming variant of chat(). Yields SSE-formatted strings.
+
+    Event types:
+      {"type": "tool_start", "tool": <name>}   — tool execution begins
+      {"type": "tool_end",   "tool": <name>}   — tool execution complete
+      {"type": "token",      "text": <str>}    — word-level answer chunk
+      {"type": "done", "sources": [...], "tools_used": [...]}  — final metadata
+
+    The agentic tool-call loop runs synchronously (tool events are real-time).
+    The final answer text is streamed word-by-word so the frontend can render
+    it progressively as it arrives.
+    """
+    log.info("chat_stream() | session=%s | emp=%s | msg=%r", session_id[:8], employee_id, message[:80])
+
+    tools = _build_tools()
+    model = genai.GenerativeModel(
+        model_name=GEMINI_MODEL,
+        tools=tools,
+        system_instruction=_build_system_prompt(employee_id),
+    )
+
+    _history[session_id].append({"role": "user", "parts": [message]})
+    _trim_history(session_id)
+
+    history_for_chat = _history[session_id][:-1]
+    convo = model.start_chat(history=history_for_chat)
+
+    tools_used = []
+    all_sources = []
+    final_answer = ""
+    current_message = message
+
+    def _sse(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    for iteration in range(MAX_ITERATIONS):
+        log.debug("Stream iteration %d/%d", iteration + 1, MAX_ITERATIONS)
+        response = convo.send_message(current_message)
+        candidate = response.candidates[0]
+        parts = candidate.content.parts
+
+        fn_calls = [p for p in parts if hasattr(p, "function_call") and p.function_call.name]
+
+        if not fn_calls:
+            final_answer = "".join(p.text for p in parts if hasattr(p, "text")).strip()
+            log.info("Stream finished | answer_len=%d | tools=%s", len(final_answer), tools_used)
+            break
+
+        tool_results = []
+        for part in fn_calls:
+            fn_name = part.function_call.name
+            fn_args = dict(part.function_call.args)
+            tools_used.append(fn_name)
+
+            # Emit tool start event
+            yield _sse({"type": "tool_start", "tool": fn_name})
+
+            result = _execute_tool(fn_name, fn_args, employee_id)
+
+            if fn_name == "search_company_documents" and "sources" in result:
+                all_sources.extend(result.get("sources", []))
+
+            # Emit tool end event
+            yield _sse({"type": "tool_end", "tool": fn_name})
+
+            tool_results.append({
+                "function_response": {
+                    "name": fn_name,
+                    "response": result,
+                }
+            })
+
+        current_message = tool_results
+
+    else:
+        log.warning("Stream hit max iterations — requesting summary.")
+        response = convo.send_message("Please summarise what you have found so far.")
+        final_answer = response.text.strip()
+
+    _history[session_id].append({"role": "model", "parts": [final_answer]})
+    _trim_history(session_id)
+
+    # Stream the answer word-by-word
+    words = final_answer.split(" ")
+    for i, word in enumerate(words):
+        chunk = word if i == 0 else " " + word
+        yield _sse({"type": "token", "text": chunk})
+
+    # Final metadata event
+    yield _sse({
+        "type": "done",
+        "sources": list(set(all_sources)),
+        "tools_used": list(dict.fromkeys(tools_used)),
+    })
 
 
 def clear_session(session_id: str):
     """Clear conversation history for a session."""
+    log.info("Clearing session: %s", session_id[:8])
     _history.pop(session_id, None)
