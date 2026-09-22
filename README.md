@@ -79,8 +79,14 @@ cd backend
 uvicorn main:app --reload --port 8000
 ```
 
-### 7. Open the frontend
-Open `frontend/index.html` directly in a browser (double-click or use a local file server).
+### 7. Start the frontend (React + Tailwind)
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 The API docs are available at: http://localhost:8000/docs
 
