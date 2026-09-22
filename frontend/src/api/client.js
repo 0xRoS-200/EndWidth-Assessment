@@ -1,14 +1,99 @@
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+const TOKEN_KEY = "employee_ai_token";
+const USER_KEY = "employee_ai_user";
+
+export function getStoredToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function getStoredUser() {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function saveAuth(token, user) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+function getAuthHeaders(contentType = true) {
+  const headers = {};
+  if (contentType) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = getStoredToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 /**
- * Send a chat message to the backend (standard, non-streaming).
+ * Authenticate employee with credentials.
  */
-export async function sendChat(employeeId, message, sessionId) {
-  const res = await fetch(`${API_BASE}/chat`, {
+export async function login(employeeId, password) {
+  const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      employee_id: employeeId,
+      employee_id: employeeId.trim().toUpperCase(),
+      password,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Login failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const user = {
+    employee_id: data.employee_id,
+    name: data.name,
+    department: data.department,
+  };
+  saveAuth(data.access_token, user);
+  return { token: data.access_token, user };
+}
+
+/**
+ * Fetch profile of currently authenticated employee.
+ */
+export async function getMe() {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: getAuthHeaders(false),
+  });
+
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      clearAuth();
+    }
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to fetch profile (${res.status})`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Send a chat message to the backend (standard, non-streaming).
+ */
+export async function sendChat(message, sessionId) {
+  const res = await fetch(`${API_BASE}/chat`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
       message,
       session_id: sessionId,
     }),
@@ -25,7 +110,6 @@ export async function sendChat(employeeId, message, sessionId) {
 /**
  * Send a chat message using the streaming SSE endpoint.
  *
- * @param {string} employeeId
  * @param {string} message
  * @param {string} sessionId
  * @param {object} callbacks
@@ -35,14 +119,13 @@ export async function sendChat(employeeId, message, sessionId) {
  * @param {(meta: {sources, tools_used}) => void} callbacks.onDone - fired on completion
  * @param {(msg: string) => void}    callbacks.onError      - fired on error
  */
-export async function streamChat(employeeId, message, sessionId, callbacks) {
+export async function streamChat(message, sessionId, callbacks) {
   const { onToolStart, onToolEnd, onToken, onDone, onError } = callbacks;
 
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
-      employee_id: employeeId,
       message,
       session_id: sessionId,
     }),
@@ -97,7 +180,8 @@ export async function streamChat(employeeId, message, sessionId, callbacks) {
  * Clear server-side conversation history for a session.
  */
 export async function clearSession(sessionId) {
-  await fetch(`${API_BASE}/session/${sessionId}`, { method: "DELETE" }).catch(
-    () => {}
-  );
+  await fetch(`${API_BASE}/session/${sessionId}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(false),
+  }).catch(() => {});
 }

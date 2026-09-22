@@ -6,132 +6,168 @@ Interactive docs (Swagger UI): [`http://localhost:8000/docs`](http://localhost:8
 
 ---
 
+## Authentication Overview
+
+All chat and session endpoints are protected using **JWT Bearer Tokens**.
+1. Log in via `POST /auth/login` with `employee_id` and `password`.
+2. Receive a signed JWT access token (valid for 8 hours by default).
+3. Include the token in the HTTP `Authorization` header for protected endpoints:
+   ```http
+   Authorization: Bearer <access_token>
+   ```
+4. The authenticated `employee_id` is extracted securely from the JWT subject claim (`sub`) on the backend, preventing client-side identity spoofing.
+
+### Demo Employee Credentials
+
+| Employee ID | Name | Department | Role | Default Password |
+|---|---|---|---|---|
+| `EMP001` | Rahul Sharma | Engineering | Software Engineer | `Rahul@123` |
+| `EMP002` | Priya Nair | HR | HR Business Partner | `Priya@123` |
+| `EMP003` | Arjun Mehta | Finance | Financial Analyst | `Arjun@123` |
+
+---
+
 ## Endpoints
 
-### `POST /chat`
+### 1. `POST /auth/login` (Public)
 
-Send a message to the AI assistant. The assistant will automatically choose the right tool(s): document search, employee info lookup, or leave application.
+Authenticate an employee and obtain a JWT Bearer token.
 
 #### Request Body
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `employee_id` | `string` | ✅ | Employee identifier, e.g. `EMP001` |
-| `message` | `string` | ✅ | The employee's question or instruction |
-| `session_id` | `string` | ❌ | UUID for conversation continuity. Auto-generated if omitted. |
-
 ```json
 {
   "employee_id": "EMP001",
+  "password": "Rahul@123"
+}
+```
+
+#### Response (200 OK)
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "employee_id": "EMP001",
+  "name": "Rahul Sharma",
+  "department": "Engineering"
+}
+```
+
+#### Error Responses
+- `401 Unauthorized`: `"Invalid employee ID or password."`
+- `422 Unprocessable Entity`: Missing fields
+
+---
+
+### 2. `GET /auth/me` (Protected)
+
+Get the authenticated employee's full profile including real-time leave balance.
+
+#### Headers
+```http
+Authorization: Bearer <access_token>
+```
+
+#### Response (200 OK)
+```json
+{
+  "employee_id": "EMP001",
+  "name": "Rahul Sharma",
+  "department": "Engineering",
+  "role": "Software Engineer",
+  "leave_balance": 12
+}
+```
+
+#### Error Responses
+- `401 Unauthorized`: Invalid or expired token
+- `403 Forbidden`: Missing Authorization header
+
+---
+
+### 3. `POST /chat` (Protected)
+
+Standard (non-streaming) chat endpoint. The assistant autonomously selects tools (`search_company_documents`, `get_employee_info`, `apply_leave`) based on user intent.
+
+#### Headers
+```http
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
+
+#### Request Body
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `message` | `string` | ✅ | The employee's question or instruction |
+| `session_id` | `string` | ❌ | UUID for conversation history. Auto-generated if omitted. |
+
+```json
+{
   "message": "What is the work from home policy?",
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }
 ```
 
-#### Response Body
-
-| Field | Type | Description |
-|---|---|---|
-| `answer` | `string` | The assistant's text response |
-| `sources` | `string[]` | Source document filenames used (empty if no RAG retrieval) |
-| `tools_used` | `string[]` | Names of tools invoked, in call order |
-| `session_id` | `string` | The session ID (echo of input, or auto-generated) |
-
+#### Response Body (200 OK)
 ```json
 {
-  "answer": "Employees can work from home up to 2 days per week with manager approval...",
+  "answer": "Employees are eligible for remote work up to 2 days per week after completing their 3-month probation period...",
   "sources": ["work_from_home_policy.txt"],
   "tools_used": ["search_company_documents"],
   "session_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }
 ```
 
-#### Example — Leave Application
-
-**Request:**
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "employee_id": "EMP001",
-    "message": "Apply leave from 2026-10-01 to 2026-10-03 for a personal trip.",
-    "session_id": "my-session-123"
-  }'
-```
-
-**Response:**
-```json
-{
-  "answer": "Leave application submitted successfully for Rahul Sharma from 2026-10-01 to 2026-10-03 (3 days). Remaining balance: 9 day(s).",
-  "sources": [],
-  "tools_used": ["get_employee_info", "apply_leave"],
-  "session_id": "my-session-123"
-}
-```
-
-#### Example — Hallucination Prevention
-
-**Request:**
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "employee_id": "EMP001",
-    "message": "Does the company provide pet insurance?"
-  }'
-```
-
-**Response:**
-```json
-{
-  "answer": "I couldn't find information about pet insurance in the provided company documents.",
-  "sources": [],
-  "tools_used": ["search_company_documents"],
-  "session_id": "<auto-generated>"
-}
-```
-
-#### Error Responses
-
-| HTTP Status | Cause | Example Detail |
-|---|---|---|
-| `422 Unprocessable Entity` | Missing or empty `employee_id` / `message` | `"employee_id cannot be empty."` |
-| `500 Internal Server Error` | Agent or LLM error | `"Agent error: <details>"` |
-
 ---
 
-### `GET /health`
+### 4. `POST /chat/stream` (Protected)
 
-Health check endpoint. Returns `200 OK` if the backend is running.
+Real-time streaming chat endpoint using **Server-Sent Events (SSE)**. Emits progress events as tools run and streams tokens word-by-word.
 
-#### Response
+#### Headers
+```http
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
 
+#### Request Body
 ```json
 {
-  "status": "ok"
+  "message": "Check my leave balance and apply 2 days leave from 2026-10-10 to 2026-10-11 for personal reasons",
+  "session_id": "session-123"
 }
 ```
 
-#### Example
+#### SSE Stream Events Emitted:
+```
+data: {"type": "tool_start", "tool": "get_employee_info"}
 
-```bash
-curl http://localhost:8000/health
+data: {"type": "tool_end", "tool": "get_employee_info"}
+
+data: {"type": "tool_start", "tool": "apply_leave"}
+
+data: {"type": "tool_end", "tool": "apply_leave"}
+
+data: {"type": "token", "text": "Your "}
+
+data: {"type": "token", "text": "leave "}
+
+data: {"type": "token", "text": "has been applied..."}
+
+data: {"type": "done", "sources": [], "tools_used": ["get_employee_info", "apply_leave"]}
 ```
 
 ---
 
-### `DELETE /session/{session_id}`
+### 5. `DELETE /session/{session_id}` (Protected)
 
-Clears the conversation history for the given session. Call this when the user clicks "Clear chat".
+Clears server-side conversation history for the specified session.
 
-#### Path Parameters
+#### Headers
+```http
+Authorization: Bearer <access_token>
+```
 
-| Parameter | Type | Description |
-|---|---|---|
-| `session_id` | `string` | The session UUID to clear |
-
-#### Response
-
+#### Response (200 OK)
 ```json
 {
   "status": "cleared",
@@ -139,59 +175,15 @@ Clears the conversation history for the given session. Call this when the user c
 }
 ```
 
-#### Example
+---
 
-```bash
-curl -X DELETE http://localhost:8000/session/a1b2c3d4-e5f6-7890-abcd-ef1234567890
+### 6. `GET /health` (Public)
+
+Service liveness and health check endpoint.
+
+#### Response (200 OK)
+```json
+{
+  "status": "ok"
+}
 ```
-
----
-
-## Available Tools (Agent)
-
-These are the tools the agent can call internally. They are not directly exposed as HTTP endpoints — the LLM decides when to call them based on user intent.
-
-### `search_company_documents(query)`
-
-Searches the vector store using semantic similarity and generates an LLM-grounded answer.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `query` | `string` | Natural language question |
-
-**Returns:** `{ answer: string, sources: string[] }`
-
----
-
-### `get_employee_info(employee_id)`
-
-Retrieves employee details from the mock database.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `employee_id` | `string` | Employee ID, e.g. `EMP001` |
-
-**Returns:** `{ employee_id, name, department, role, leave_balance }`
-
----
-
-### `apply_leave(employee_id, start_date, end_date, reason)`
-
-Validates and submits a leave application, deducting from the balance.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `employee_id` | `string` | Employee ID (always forced to the authenticated user's ID) |
-| `start_date` | `string` | `YYYY-MM-DD` format |
-| `end_date` | `string` | `YYYY-MM-DD` format (≥ start_date) |
-| `reason` | `string` | Reason for leave |
-
-**Returns:** `{ status: "success" | "failure", message: string }`
-
----
-
-## Notes
-
-- `session_id` is the key for conversation memory. Reuse the same ID across requests to maintain context.
-- Leave balance updates are **in-memory only** — restarting the server resets them.
-- The `employee_id` passed in `/chat` is trusted. `apply_leave` always uses this authenticated ID regardless of what the model attempts to pass.

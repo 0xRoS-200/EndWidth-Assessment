@@ -3,18 +3,21 @@
     "name": "Rahul Sharma",
     "department": "Engineering",
     "role": "Software Engineer",
-    "leave_balance": 12
+    "leave_balance": 12,
+    "password_hash": "76b5573f4fa5e70ce8bc70f4af6671e8da3af3e802e83e0a9183c70b3abb007d"
   },
   "EMP002": {
     "name": "Priya Nair",
     "department": "HR",
     "role": "HR Business Partner",
-    "leave_balance": 8
+    "leave_balance": 8,
+    "password_hash": "8332a769ae64c601ef99f0e2dd51786667f1b3d0e5d125c4ce8841e16cce15c9"
   },
   "EMP003": {
     "name": "Arjun Mehta",
     "department": "Finance",
     "role": "Financial Analyst",
-    "leave_balance": 5
+    "leave_balance": 5,
+    "password_hash": "255ea3b51c4ca0814a74e3c1a2392fcf20edeeabcd1b1e6bbc705dde02686ebb"
   }
 }
