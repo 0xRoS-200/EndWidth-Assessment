@@ -1,165 +1,348 @@
 import { useState } from "react";
-import { Bot, Lock, User, ArrowRight, ShieldCheck, Sparkles, AlertCircle } from "lucide-react";
 import { login } from "../api/client";
 
 const DEMO_CREDENTIALS = [
-  { id: "EMP001", name: "Rahul Sharma", role: "Software Engineer", dept: "Engineering", pass: "Rahul@123" },
-  { id: "EMP002", name: "Priya Nair", role: "HR Business Partner", dept: "HR", pass: "Priya@123" },
-  { id: "EMP003", name: "Arjun Mehta", role: "Financial Analyst", dept: "Finance", pass: "Arjun@123" },
+  { id: "EMP001", name: "Rahul Sharma",  dept: "Engineering", pass: "Rahul@123", initials: "RS", grad: "linear-gradient(135deg,#3D5AFF,#6B5AFF)" },
+  { id: "EMP002", name: "Priya Nair",    dept: "HR",          pass: "Priya@123", initials: "PN", grad: "linear-gradient(135deg,#6B5AFF,#a78bfa)" },
+  { id: "EMP003", name: "Arjun Mehta",   dept: "Finance",     pass: "Arjun@123", initials: "AM", grad: "linear-gradient(135deg,#3D99FF,#3D5AFF)" },
 ];
+
+/* ── Inline SVG logo ── */
+function LogoMark() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 40 40" fill="none">
+      <defs>
+        <linearGradient id="lm1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#6B8AFF" />
+          <stop offset="100%" stopColor="#3D5AFF" />
+        </linearGradient>
+        <linearGradient id="lm2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#a78bfa" />
+          <stop offset="100%" stopColor="#6B5AFF" />
+        </linearGradient>
+      </defs>
+      <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" stroke="url(#lm1)" strokeWidth="1.5" fill="none" />
+      <polygon points="20,8 30,14 30,26 20,32 10,26 10,14" stroke="url(#lm2)" strokeWidth="1" fill="rgba(61,90,255,0.1)" />
+      <circle cx="20" cy="20" r="3" fill="url(#lm2)" />
+      <line x1="20" y1="8"  x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+      <line x1="30" y1="14" x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+      <line x1="30" y1="26" x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+      <line x1="20" y1="32" x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+      <line x1="10" y1="26" x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+      <line x1="10" y1="14" x2="20" y2="20" stroke="url(#lm1)" strokeWidth="0.9" opacity="0.7"/>
+    </svg>
+  );
+}
+
+function EyeIcon({ open }) {
+  return open ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
+/* ── Input field ── */
+function Field({ label, icon, children }) {
+  return (
+    <div style={{ marginBottom: "13px" }}>
+      <label style={{
+        display: "block", fontSize: "10.5px", fontWeight: 600,
+        color: "rgba(180,195,255,0.5)", marginBottom: "6px",
+        textTransform: "uppercase", letterSpacing: "0.08em",
+      }}>
+        {label}
+      </label>
+      <div
+        className="input-focus"
+        style={{
+          display: "flex", alignItems: "center", gap: "8px",
+          background: "rgba(10,14,50,0.55)",
+          border: "1px solid rgba(61,90,255,0.2)",
+          borderRadius: "9px",
+          padding: "0 12px",
+        }}
+      >
+        <span style={{ color: "rgba(180,195,255,0.35)", display: "flex", flexShrink: 0 }}>{icon}</span>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function LoginScreen({ onLoginSuccess }) {
   const [employeeId, setEmployeeId] = useState("EMP001");
-  const [password, setPassword] = useState("Rahul@123");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [password,   setPassword]   = useState("Rahul@123");
+  const [showPass,   setShowPass]   = useState(false);
+  const [error,      setError]      = useState("");
+  const [isLoading,  setIsLoading]  = useState(false);
 
   const handleSubmit = async (e) => {
     e?.preventDefault();
-    if (!employeeId.trim() || !password.trim()) {
-      setError("Please enter both Employee ID and password.");
-      return;
-    }
-
+    if (!employeeId.trim() || !password.trim()) { setError("Please fill in both fields."); return; }
     setError("");
     setIsLoading(true);
-
     try {
       const { user } = await login(employeeId, password);
       onLoginSuccess(user);
     } catch (err) {
-      setError(err.message || "Invalid credentials. Please try again.");
+      setError(err.message || "Invalid credentials.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleQuickSelect = (demo) => {
-    setEmployeeId(demo.id);
-    setPassword(demo.pass);
-    setError("");
-  };
-
   return (
-    <div className="min-h-screen bg-[#0d1117] text-slate-200 flex flex-col justify-center items-center px-4 relative overflow-hidden">
-      {/* Subtle background ambient lights */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[350px] bg-blue-500/10 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/3 w-[450px] h-[300px] bg-emerald-500/10 blur-[130px] rounded-full pointer-events-none" />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "16px", position: "relative",
+    }}>
+      <div className="aura-bg" />
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-blue-500 to-emerald-500 shadow-xl shadow-blue-500/20 mb-4 ring-1 ring-white/20">
-            <Bot className="w-8 h-8 text-white" />
+      {/* Subtle ambient orbs */}
+      <div style={{
+        position: "fixed", top: "20%", left: "15%",
+        width: "260px", height: "260px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(61,90,255,0.1) 0%, transparent 70%)",
+        pointerEvents: "none", zIndex: 0,
+      }} className="animate-float" />
+      <div style={{
+        position: "fixed", bottom: "18%", right: "12%",
+        width: "200px", height: "200px", borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(167,139,250,0.09) 0%, transparent 70%)",
+        pointerEvents: "none", zIndex: 0,
+      }} />
+
+      {/* ── Card ── */}
+      <div
+        className="animate-fade"
+        style={{
+          width: "100%", maxWidth: "380px",
+          position: "relative", zIndex: 1,
+          background: "rgba(12,16,48,0.82)",
+          backdropFilter: "blur(28px)",
+          WebkitBackdropFilter: "blur(28px)",
+          borderRadius: "20px",
+          border: "1px solid rgba(61,90,255,0.22)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(61,90,255,0.15)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Subtle top gradient bar */}
+        <div style={{
+          height: "2px",
+          background: "linear-gradient(90deg, transparent, #3D5AFF 40%, #a78bfa 70%, transparent)",
+        }} />
+
+        <div style={{ padding: "24px 26px 26px" }}>
+
+          {/* ── Brand row ── */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "10px",
+            marginBottom: "22px",
+          }}>
+            <div style={{
+              width: "38px", height: "38px",
+              background: "rgba(61,90,255,0.14)",
+              border: "1px solid rgba(61,90,255,0.3)",
+              borderRadius: "11px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+              boxShadow: "0 4px 16px rgba(61,90,255,0.2)",
+            }}>
+              <LogoMark />
+            </div>
+            <div>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: "#e8edff", letterSpacing: "-0.2px", lineHeight: 1.2 }}>
+                NexusAI
+              </div>
+              <div style={{ fontSize: "11px", color: "rgba(180,195,255,0.45)", letterSpacing: "0.01em" }}>
+                Employee Assistant
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">
-            Employee AI Assistant
-          </h1>
-          <p className="text-xs text-slate-400 mt-1.5 flex items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            Secure Employee Portal with JWT Authentication
-          </p>
-        </div>
 
-        {/* Login Card */}
-        <div className="bg-[#161b22]/90 border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
+          {/* ── Error ── */}
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-2.5 text-red-400 text-xs animate-fade-in">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
+            <div className="animate-fade-in" style={{
+              display: "flex", alignItems: "center", gap: "7px",
+              padding: "8px 12px", borderRadius: "8px",
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.22)",
+              color: "#fca5a5", fontSize: "12px",
+              marginBottom: "14px",
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Employee ID
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={employeeId}
-                  onChange={(e) => setEmployeeId(e.target.value)}
-                  placeholder="e.g. EMP001"
-                  required
-                  className="w-full bg-[#0d1117] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all uppercase"
-                />
-              </div>
-            </div>
+          {/* ── Form ── */}
+          <form onSubmit={handleSubmit}>
+            <Field
+              label="Employee ID"
+              icon={
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z"/>
+                </svg>
+              }
+            >
+              <input
+                id="employee-id-input"
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="EMP001"
+                required
+                style={{
+                  flex: 1, padding: "10px 0", border: "none", outline: "none",
+                  background: "transparent", fontSize: "13.5px",
+                  color: "#e8edff", fontFamily: "inherit",
+                }}
+              />
+            </Field>
 
-            <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  className="w-full bg-[#0d1117] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-all"
-                />
-              </div>
-            </div>
+            <Field
+              label="Password"
+              icon={
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                </svg>
+              }
+            >
+              <input
+                id="password-input"
+                type={showPass ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                required
+                style={{
+                  flex: 1, padding: "10px 0", border: "none", outline: "none",
+                  background: "transparent", fontSize: "13.5px",
+                  color: "#e8edff", fontFamily: "inherit",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "rgba(180,195,255,0.35)", display: "flex",
+                  padding: "2px", transition: "color 0.15s", flexShrink: 0,
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = "rgba(180,195,255,0.75)"}
+                onMouseOut={(e) => e.currentTarget.style.color = "rgba(180,195,255,0.35)"}
+              >
+                <EyeIcon open={showPass} />
+              </button>
+            </Field>
 
             <button
               type="submit"
+              id="signin-button"
               disabled={isLoading}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+              className="btn-accent"
+              style={{
+                width: "100%", padding: "11px",
+                borderRadius: "9px", fontSize: "13.5px",
+                marginTop: "4px",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
+              }}
             >
               {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    style={{ animation: "spin-slow 0.9s linear infinite" }}>
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                  </svg>
+                  Signing in...
+                </>
               ) : (
                 <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+                  </svg>
+                  Sign In
                 </>
               )}
             </button>
           </form>
 
-          {/* Quick Demo Test Accounts */}
-          <div className="mt-6 pt-5 border-t border-white/[0.06]">
-            <div className="flex items-center gap-1.5 mb-3 text-slate-400 text-xs font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Quick Demo Accounts (Click to Fill)</span>
-            </div>
+          {/* ── Demo accounts ── */}
+          <div style={{
+            marginTop: "18px",
+            paddingTop: "16px",
+            borderTop: "1px solid rgba(61,90,255,0.12)",
+          }}>
+            <p style={{
+              fontSize: "10px", fontWeight: 600,
+              color: "rgba(180,195,255,0.35)",
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              marginBottom: "10px",
+            }}>
+              Demo — click to autofill
+            </p>
 
-            <div className="space-y-2">
-              {DEMO_CREDENTIALS.map((demo) => (
-                <button
-                  key={demo.id}
-                  type="button"
-                  onClick={() => handleQuickSelect(demo)}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
-                    employeeId === demo.id
-                      ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
-                      : "bg-[#0d1117]/60 border-white/[0.05] hover:bg-white/[0.03] text-slate-300"
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-slate-200">{demo.id}</span>
-                      <span className="text-xs text-slate-400">• {demo.name}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {DEMO_CREDENTIALS.map((demo) => {
+                const selected = employeeId === demo.id;
+                return (
+                  <button
+                    key={demo.id}
+                    id={`demo-${demo.id.toLowerCase()}`}
+                    type="button"
+                    onClick={() => { setEmployeeId(demo.id); setPassword(demo.pass); setError(""); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "10px",
+                      padding: "8px 10px",
+                      border: selected ? "1px solid rgba(61,90,255,0.45)" : "1px solid rgba(61,90,255,0.1)",
+                      borderRadius: "9px",
+                      background: selected ? "rgba(61,90,255,0.13)" : "rgba(20,28,68,0.35)",
+                      cursor: "pointer", textAlign: "left",
+                      transition: "all 0.15s ease",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseOver={(e) => { if (!selected) { e.currentTarget.style.borderColor = "rgba(61,90,255,0.3)"; e.currentTarget.style.background = "rgba(61,90,255,0.08)"; }}}
+                    onMouseOut={(e) => { if (!selected) { e.currentTarget.style.borderColor = "rgba(61,90,255,0.1)"; e.currentTarget.style.background = "rgba(20,28,68,0.35)"; }}}
+                  >
+                    {/* Avatar */}
+                    <div style={{
+                      width: "28px", height: "28px", borderRadius: "7px",
+                      background: demo.grad,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#fff", fontWeight: 700, fontSize: "10px",
+                      flexShrink: 0, letterSpacing: "0.02em",
+                    }}>
+                      {demo.initials}
                     </div>
-                    <span className="text-[11px] text-slate-500">{demo.role} ({demo.dept})</span>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-slate-400">
-                    {demo.pass}
-                  </span>
-                </button>
-              ))}
+
+                    {/* Name + dept */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#d8e0ff", lineHeight: 1.2 }}>{demo.name}</div>
+                      <div style={{ fontSize: "10.5px", color: "rgba(180,195,255,0.4)", marginTop: "1px" }}>{demo.id} · {demo.dept}</div>
+                    </div>
+
+                    {/* Checkmark when selected */}
+                    {selected && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b8aff" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
-
-        {/* Footer Note */}
-        <p className="text-center text-[11px] text-slate-600 mt-6">
-          Tokens expire in 8 hours • Secure Bearer JWT verification on all assistant APIs
-        </p>
       </div>
     </div>
   );

@@ -4,12 +4,11 @@ import { Send } from "lucide-react";
 export default function ChatInput({ onSend, disabled }) {
   const textareaRef = useRef(null);
 
-  // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
     ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+    ta.style.height = Math.min(ta.scrollHeight, 130) + "px";
   });
 
   function handleKeyDown(e) {
@@ -28,33 +27,83 @@ export default function ChatInput({ onSend, disabled }) {
   }
 
   return (
-    <div className="px-4 pb-4 pt-3 bg-[#0d1117] border-t border-white/[0.06]">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-end gap-3 bg-[#1e2433] border border-white/[0.08] rounded-2xl
-                        px-4 py-3 focus-within:border-blue-500/50 transition-colors duration-200 shadow-lg">
+    <div style={{
+      padding: "10px 20px 14px",
+      background: "rgba(7,9,26,0.9)",
+      backdropFilter: "blur(20px)",
+      WebkitBackdropFilter: "blur(20px)",
+      borderTop: "1px solid rgba(61,90,255,0.12)",
+      flexShrink: 0,
+    }}>
+      {/* Centred, max-width wrapper — same width as the message thread above */}
+      <div style={{
+        maxWidth: "700px",
+        margin: "0 auto",
+        width: "100%",
+      }}>
+        <div
+          className="input-focus"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background: "rgba(14,20,58,0.8)",
+            border: "1.5px solid rgba(61,90,255,0.22)",
+            borderRadius: "12px",
+            padding: "10px 10px 10px 16px",
+            transition: "border-color 0.2s, box-shadow 0.2s",
+          }}
+        >
           <textarea
             ref={textareaRef}
+            id="chat-textarea"
             rows={1}
-            placeholder="Ask about policies, leave, benefits…"
+            placeholder="Ask about policies, leave balance, or submit a request…"
             disabled={disabled}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent border-none outline-none resize-none text-slate-200
-                       placeholder-slate-500 text-sm leading-relaxed max-h-[120px]
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              resize: "none",
+              fontSize: "13.5px",
+              color: "#e8edff",
+              lineHeight: "1.5",
+              maxHeight: "130px",
+              fontFamily: "inherit",
+              padding: "0",
+              margin: "0",
+              display: "block",
+            }}
           />
           <button
+            id="chat-send-btn"
             onClick={submit}
             disabled={disabled}
-            aria-label="Send message"
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0
-                       bg-blue-600 hover:bg-blue-500 active:scale-95 disabled:opacity-40
-                       disabled:cursor-not-allowed text-white transition-all duration-150 shadow-md"
+            className="btn-accent"
+            style={{
+              width: "34px",
+              height: "34px",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
           >
-            <Send className="w-4 h-4" />
+            <Send size={14} />
           </button>
         </div>
-        <p className="text-center text-xs text-slate-600 mt-2">
-          Press <kbd className="font-mono">Enter</kbd> to send &nbsp;·&nbsp; <kbd className="font-mono">Shift+Enter</kbd> for new line
+
+        <p style={{
+          textAlign: "center",
+          fontSize: "10.5px",
+          color: "rgba(180,195,255,0.25)",
+          marginTop: "6px",
+          letterSpacing: "0.01em",
+        }}>
+          Press <kbd>Enter</kbd> to send &middot; <kbd>Shift+Enter</kbd> for new line
         </p>
       </div>
     </div>

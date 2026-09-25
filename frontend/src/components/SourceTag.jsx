@@ -1,11 +1,21 @@
-import { FileText } from "lucide-react";
-
 export default function SourceTag({ source }) {
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-                     bg-blue-500/10 text-blue-400 border border-blue-500/20
-                     hover:bg-blue-500/20 transition-colors duration-150">
-      <FileText className="w-3 h-3 flex-shrink-0" />
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "4px",
+      padding: "3px 10px",
+      borderRadius: "99px",
+      fontSize: "11px",
+      fontWeight: 500,
+      color: "rgba(147,168,255,0.85)",
+      background: "rgba(61,90,255,0.12)",
+      border: "1px solid rgba(61,90,255,0.22)",
+      letterSpacing: "0.01em",
+    }}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
       {source}
     </span>
   );

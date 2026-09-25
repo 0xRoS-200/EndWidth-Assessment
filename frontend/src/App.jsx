@@ -15,31 +15,53 @@ import {
   clearAuth,
 } from "./api/client";
 
-// Human-readable tool labels
 const TOOL_LABELS = {
   search_company_documents: "Searching documents",
-  get_employee_info: "Fetching employee info",
-  apply_leave: "Applying leave",
+  get_employee_info:        "Fetching employee info",
+  apply_leave:              "Processing leave request",
 };
 
+/* ── Mobile sidebar toggle button ── */
+function HamburgerBtn({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: "36px", height: "36px",
+        background: "rgba(61,90,255,0.12)",
+        border: "1px solid rgba(61,90,255,0.25)",
+        borderRadius: "9px",
+        cursor: "pointer", color: "rgba(180,195,255,0.8)",
+        transition: "all 0.15s",
+      }}
+      onMouseOver={(e) => e.currentTarget.style.background = "rgba(61,90,255,0.22)"}
+      onMouseOut={(e) => e.currentTarget.style.background = "rgba(61,90,255,0.12)"}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+  );
+}
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
-  const [userProfile, setUserProfile] = useState(null);
-  const [sessionId, setSessionId] = useState(() => uuidv4());
-  const [messages, setMessages] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTools, setActiveTools] = useState([]); // tools currently executing
-  const [streamingText, setStreamingText] = useState(""); // accumulates current answer
+  const [currentUser,   setCurrentUser]   = useState(() => getStoredUser());
+  const [userProfile,   setUserProfile]   = useState(null);
+  const [sessionId,     setSessionId]     = useState(() => uuidv4());
+  const [messages,      setMessages]      = useState([]);
+  const [isLoading,     setIsLoading]     = useState(false);
+  const [activeTools,   setActiveTools]   = useState([]);
+  const [streamingText, setStreamingText] = useState("");
+  const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const bottomRef = useRef(null);
 
-  // Sync profile from backend on login / mount if token exists
   const fetchProfile = useCallback(async () => {
     if (!getStoredToken()) return;
     try {
       const profile = await getMe();
       setUserProfile(profile);
     } catch {
-      // If token expired or invalid, log out
       clearAuth();
       setCurrentUser(null);
       setUserProfile(null);
@@ -47,12 +69,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchProfile();
-    }
+    if (currentUser) fetchProfile();
   }, [currentUser, fetchProfile]);
 
-  // Scroll to bottom whenever content changes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, streamingText, activeTools]);
@@ -66,11 +85,7 @@ export default function App() {
   };
 
   const handleLogout = useCallback(async () => {
-    try {
-      await clearSession(sessionId);
-    } catch {
-      // ignore
-    }
+    try { await clearSession(sessionId); } catch { /* ignore */ }
     clearAuth();
     setCurrentUser(null);
     setUserProfile(null);
@@ -80,77 +95,47 @@ export default function App() {
     setSessionId(uuidv4());
   }, [sessionId]);
 
-  const handleSend = useCallback(
-    async (text) => {
-      if (isLoading) return;
+  const handleSend = useCallback(async (text) => {
+    if (isLoading) return;
+    setSidebarOpen(false);
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setIsLoading(true);
+    setStreamingText("");
+    setActiveTools([]);
+    let accumulated = "";
 
-      setMessages((prev) => [...prev, { role: "user", content: text }]);
-      setIsLoading(true);
+    try {
+      await streamChat(text, sessionId, {
+        onToolStart: (tool) => setActiveTools((prev) => [...prev, tool]),
+        onToolEnd:   (tool) => setActiveTools((prev) => prev.filter((t) => t !== tool)),
+        onToken:     (token) => { accumulated += token; setStreamingText(accumulated); },
+        onDone: ({ sources, tools_used }) => {
+          setMessages((prev) => [...prev, {
+            role: "ai", content: accumulated,
+            sources: sources ?? [], toolsUsed: tools_used ?? [],
+          }]);
+          setStreamingText("");
+          setActiveTools([]);
+          if (tools_used?.includes("apply_leave")) fetchProfile();
+        },
+        onError: (msg) => {
+          setMessages((prev) => [...prev, { role: "error", content: msg }]);
+          setStreamingText("");
+          setActiveTools([]);
+        },
+      });
+    } catch (err) {
+      if (err.message?.includes("401") || err.message?.includes("403")) { handleLogout(); return; }
+      setMessages((prev) => [...prev, {
+        role: "error",
+        content: err.message || "Could not reach the assistant. Is the backend running?",
+      }]);
       setStreamingText("");
       setActiveTools([]);
-
-      let accumulated = "";
-
-      try {
-        await streamChat(text, sessionId, {
-          onToolStart: (tool) => {
-            setActiveTools((prev) => [...prev, tool]);
-          },
-          onToolEnd: (tool) => {
-            setActiveTools((prev) => prev.filter((t) => t !== tool));
-          },
-          onToken: (token) => {
-            accumulated += token;
-            setStreamingText(accumulated);
-          },
-          onDone: ({ sources, tools_used }) => {
-            // Commit streamed text as a proper message
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "ai",
-                content: accumulated,
-                sources: sources ?? [],
-                toolsUsed: tools_used ?? [],
-              },
-            ]);
-            setStreamingText("");
-            setActiveTools([]);
-
-            // If leave was applied or employee info queried, refresh profile to reflect new balance
-            if (tools_used?.includes("apply_leave")) {
-              fetchProfile();
-            }
-          },
-          onError: (msg) => {
-            setMessages((prev) => [
-              ...prev,
-              { role: "error", content: msg },
-            ]);
-            setStreamingText("");
-            setActiveTools([]);
-          },
-        });
-      } catch (err) {
-        if (err.message && (err.message.includes("401") || err.message.includes("403"))) {
-          handleLogout();
-          return;
-        }
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "error",
-            content: err.message || "Could not reach the assistant. Is the backend running?",
-          },
-        ]);
-        setStreamingText("");
-        setActiveTools([]);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [sessionId, isLoading, fetchProfile, handleLogout]
-  );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId, isLoading, fetchProfile, handleLogout]);
 
   const handleClear = useCallback(async () => {
     await clearSession(sessionId);
@@ -160,44 +145,97 @@ export default function App() {
     setActiveTools([]);
   }, [sessionId]);
 
-  // If user is not logged in, show Login Screen
   if (!currentUser) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
-    <div className="flex h-screen bg-[#0d1117] text-slate-200 overflow-hidden">
-      <Sidebar
-        user={currentUser}
-        userProfile={userProfile}
-        onClearChat={handleClear}
-        onLogout={handleLogout}
-      />
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", position: "relative" }}>
+      {/* ── Aura background ── */}
+      <div className="aura-bg" />
 
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="px-6 py-4 border-b border-white/[0.06] bg-[#0d1117] flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-sm font-semibold text-slate-100">
-                Employee AI Assistant
-              </h1>
-              <p className="text-xs text-slate-500">
-                Logged in as <span className="text-slate-300 font-medium">{currentUser.name}</span> ({currentUser.employee_id})
-              </p>
+      {/* ── Mobile sidebar overlay ── */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 40,
+            background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)",
+          }}
+        />
+      )}
+
+      {/* ── Sidebar (responsive) ── */}
+      <div style={{
+        position: window.innerWidth < 768 ? "fixed" : "relative",
+        zIndex: 50,
+        height: "100%",
+        transform: window.innerWidth < 768 ? (sidebarOpen ? "translateX(0)" : "translateX(-100%)") : "none",
+        transition: "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+        flexShrink: 0,
+      }}>
+        <Sidebar
+          user={currentUser}
+          userProfile={userProfile}
+          onClearChat={handleClear}
+          onLogout={handleLogout}
+        />
+      </div>
+
+      {/* ── Main chat area ── */}
+      <main style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        position: "relative",
+        zIndex: 1,
+      }}>
+
+        {/* ── Header ── */}
+        <header style={{
+          padding: "11px 20px",
+          background: "rgba(7,9,26,0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(61,90,255,0.12)",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          flexShrink: 0,
+          zIndex: 10,
+        }}>
+          {/* Mobile hamburger */}
+          <div style={{ display: "none" }} className="mobile-menu-btn">
+            <HamburgerBtn onClick={() => setSidebarOpen(!sidebarOpen)} />
+          </div>
+
+          {/* Title */}
+          <div>
+            <div style={{ fontWeight: 600, fontSize: "14px", color: "#e8edff" }}>
+              Employee AI Assistant
             </div>
-            <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-              <span className="hidden sm:block">Powered by Gemini</span>
-              <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-medium">
-                RAG + Agent
-              </span>
+            <div style={{ fontSize: "11px", color: "rgba(180,195,255,0.4)", marginTop: "1px" }}>
+              {currentUser.name} &middot; {currentUser.employee_id}
             </div>
+          </div>
+
+          {/* Status + badges */}
+          <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
+            <span className="status-dot" style={{ marginRight: "2px" }} />
+            <span className="tag tag-rag">RAG</span>
+            <span className="tag tag-agent">Agent</span>
           </div>
         </header>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
-          <div className="max-w-3xl mx-auto flex flex-col gap-5 min-h-full">
+        {/* ── Messages area ── */}
+        <div style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "20px 16px",
+        }}>
+          <div style={{ maxWidth: "700px", margin: "0 auto", minHeight: "100%", width: "100%" }}>
             {messages.length === 0 && !isLoading && !streamingText ? (
               <WelcomeScreen onSuggestion={handleSend} />
             ) : (
@@ -212,36 +250,64 @@ export default function App() {
                   />
                 ))}
 
-                {/* Live tool activity banner */}
+                {/* Active tool banner */}
                 {activeTools.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/15 animate-fade-in">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                    <span className="text-xs text-emerald-400 font-medium">
-                      {TOOL_LABELS[activeTools[activeTools.length - 1]] ?? activeTools[activeTools.length - 1]}…
-                    </span>
+                  <div className="animate-fade-in" style={{
+                    display: "flex", alignItems: "center", gap: "8px",
+                    padding: "7px 14px",
+                    background: "rgba(61,90,255,0.08)",
+                    border: "1px solid rgba(61,90,255,0.18)",
+                    borderRadius: "8px",
+                    marginBottom: "10px", fontSize: "12px",
+                    color: "rgba(147,168,255,0.8)",
+                  }}>
+                    <span style={{
+                      width: "6px", height: "6px", borderRadius: "50%",
+                      background: "#6b8aff", flexShrink: 0,
+                      animation: "pulse-glow 1.5s infinite",
+                      display: "inline-block",
+                    }} />
+                    {TOOL_LABELS[activeTools[activeTools.length - 1]] ?? activeTools[activeTools.length - 1]}...
                   </div>
                 )}
 
-                {/* Streaming answer bubble */}
+                {/* Streaming bubble */}
                 {streamingText && (
-                  <div className="flex gap-3 animate-fade-in">
-                    <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-md">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15M14.25 3.104c.251.023.501.05.75.082M19.8 15l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.607L5 14.5m14.8.5l1.196 4.765a1.5 1.5 0 01-1.455 1.885H4.459a1.5 1.5 0 01-1.455-1.885L4.2 15" />
+                  <div className="animate-fade-in" style={{ display: "flex", gap: "9px", marginBottom: "16px" }}>
+                    <div style={{
+                      width: "30px", height: "30px", borderRadius: "50%", flexShrink: 0,
+                      background: "rgba(61,90,255,0.18)",
+                      border: "1px solid rgba(61,90,255,0.35)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeWidth="1.8">
+                        <defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#6b8aff"/><stop offset="100%" stopColor="#a78bfa"/></linearGradient></defs>
+                        <path stroke="url(#sg)" strokeLinecap="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                       </svg>
                     </div>
-                    <div className="max-w-[72%] px-4 py-3 rounded-2xl rounded-tl-sm bg-[#1e2433] border border-white/[0.06] text-slate-200 text-sm leading-relaxed shadow-sm">
+                    <div className="msg-ai" style={{
+                      padding: "10px 14px",
+                      borderRadius: "16px 16px 16px 4px",
+                      fontSize: "14px", lineHeight: "1.65",
+                      maxWidth: "75%",
+                      wordBreak: "break-word",
+                    }}>
                       {streamingText}
-                      <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-middle" />
+                      <span style={{
+                        display: "inline-block",
+                        width: "2px", height: "13px",
+                        background: "#6b8aff",
+                        marginLeft: "3px",
+                        verticalAlign: "middle",
+                        animation: "pulse-glow 0.8s infinite",
+                        borderRadius: "1px",
+                      }} />
                     </div>
                   </div>
                 )}
 
                 {/* Typing indicator */}
-                {isLoading && !streamingText && activeTools.length === 0 && (
-                  <TypingIndicator />
-                )}
+                {isLoading && !streamingText && activeTools.length === 0 && <TypingIndicator />}
               </>
             )}
             <div ref={bottomRef} />
@@ -250,6 +316,21 @@ export default function App() {
 
         <ChatInput onSend={handleSend} disabled={isLoading} />
       </main>
+
+      {/* Responsive styles injected via style tag */}
+      <style>{`
+        @media (max-width: 767px) {
+          .mobile-menu-btn { display: flex !important; }
+        }
+        @media (max-width: 767px) {
+          aside {
+            position: fixed !important;
+          }
+        }
+        @media (min-width: 768px) {
+          .mobile-menu-btn { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -1,22 +1,52 @@
 export default function TypingIndicator() {
   return (
-    <div className="flex gap-3 animate-fade-in">
-      {/* Avatar */}
-      <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center
-                      bg-gradient-to-br from-emerald-500 to-blue-600 text-white shadow-md">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15M14.25 3.104c.251.023.501.05.75.082M19.8 15l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.607L5 14.5m14.8.5l1.196 4.765a1.5 1.5 0 01-1.455 1.885H4.459a1.5 1.5 0 01-1.455-1.885L4.2 15" />
+    <div className="animate-fade-in" style={{
+      display: "flex",
+      gap: "10px",
+      marginBottom: "18px",
+      alignItems: "flex-start",
+    }}>
+      {/* AI avatar */}
+      <div style={{
+        width: "34px", height: "34px", borderRadius: "10px", flexShrink: 0,
+        background: "rgba(61,90,255,0.15)",
+        border: "1px solid rgba(61,90,255,0.3)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="1.8">
+          <defs>
+            <linearGradient id="tigrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#6b8aff"/>
+              <stop offset="100%" stopColor="#a78bfa"/>
+            </linearGradient>
+          </defs>
+          <path stroke="url(#tigrad)" strokeLinecap="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
         </svg>
       </div>
 
       {/* Dots bubble */}
-      <div className="px-4 py-3.5 rounded-2xl rounded-tl-sm bg-[#1e2433] border border-white/[0.06] shadow-sm">
-        <div className="flex gap-1.5 items-center">
-          <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:0ms]" />
-          <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:150ms]" />
-          <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:300ms]" />
-        </div>
+      <div className="msg-ai" style={{
+        padding: "12px 18px",
+        borderRadius: "18px 18px 18px 4px",
+        display: "flex",
+        gap: "5px",
+        alignItems: "center",
+      }}>
+        <span className="typing-dot" style={{
+          width: "7px", height: "7px", borderRadius: "50%",
+          background: "rgba(107,138,255,0.7)",
+          display: "inline-block",
+        }} />
+        <span className="typing-dot" style={{
+          width: "7px", height: "7px", borderRadius: "50%",
+          background: "rgba(107,138,255,0.7)",
+          display: "inline-block",
+        }} />
+        <span className="typing-dot" style={{
+          width: "7px", height: "7px", borderRadius: "50%",
+          background: "rgba(107,138,255,0.7)",
+          display: "inline-block",
+        }} />
       </div>
     </div>
   );

@@ -1,19 +1,28 @@
-import { Wrench } from "lucide-react";
-
-// Human-readable tool labels
 const TOOL_LABELS = {
-  search_company_documents: "Document Search",
-  get_employee_info: "Employee Info",
-  apply_leave: "Apply Leave",
+  search_company_documents: "Docs Search",
+  get_employee_info:        "Employee Info",
+  apply_leave:              "Leave Applied",
 };
 
 export default function ToolTag({ tool }) {
-  const label = TOOL_LABELS[tool] || tool;
+  const label = TOOL_LABELS[tool] ?? tool;
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
-                     bg-emerald-500/10 text-emerald-400 border border-emerald-500/20
-                     hover:bg-emerald-500/20 transition-colors duration-150">
-      <Wrench className="w-3 h-3 flex-shrink-0" />
+    <span style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "4px",
+      padding: "3px 10px",
+      borderRadius: "99px",
+      fontSize: "11px",
+      fontWeight: 500,
+      color: "rgba(110,231,183,0.85)",
+      background: "rgba(52,211,153,0.1)",
+      border: "1px solid rgba(52,211,153,0.2)",
+      letterSpacing: "0.01em",
+    }}>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
       {label}
     </span>
   );
