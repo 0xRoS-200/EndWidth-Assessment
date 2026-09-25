@@ -221,12 +221,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Status + badges */}
-          <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
-            <span className="status-dot" style={{ marginRight: "2px" }} />
-            <span className="tag tag-rag">RAG</span>
-            <span className="tag tag-agent">Agent</span>
-          </div>
+
         </header>
 
         {/* ── Messages area ── */}
