@@ -2,8 +2,6 @@
 
 An AI-powered chat assistant that helps employees get answers to company policy questions, check their leave balance, and apply for leave — all in one place.
 
-Built for the **EndWidth Full Stack + Generative AI Assessment**.
-
 ---
 
 ## What Does It Do?
@@ -21,56 +19,21 @@ If the information isn't in the company documents, it will say so honestly — i
 
 ## How It Works (Simple Version)
 
-```
-You type a question
-        ↓
-  AI Agent decides what to do
-        ↓
-  ┌──────────────────────────────────────┐
-  │  Option A: Search company documents  │  ← for policy questions
-  │  Option B: Look up your info         │  ← for leave balance
-  │  Option C: Apply for leave           │  ← for leave requests
-  └──────────────────────────────────────┘
-        ↓
-  LLM writes a clear answer
-        ↓
-  You see the answer + sources used
+```mermaid
+flowchart TD
+    A["User types a question"] --> B["AI Agent decides what to do"]
+    B --> C1["Option A: Search company documents<br/><i>(for policy questions)</i>"]
+    B --> C2["Option B: Look up your info<br/><i>(for leave balance)</i>"]
+    B --> C3["Option C: Apply for leave<br/><i>(for leave requests)</i>"]
+    C1 --> D["LLM writes a clear answer"]
+    C2 --> D
+    C3 --> D
+    D --> E["You see the answer + sources used"]
 ```
 
 ---
 
 ## Architecture
-
-**High-level diagram:**
-
-```
-                    Company Documents (.txt)
-                            │
-                      Load & Split into Chunks
-                            │
-                    Generate Embeddings (Gemini)
-                            │
-                     JSON Vector Store (NumPy)
-                            │
-    ┌───────────────────────────────────────────────────────┐
-    │                   FastAPI Backend                     │
-    │                                                       │
-    │  User → POST /chat → JWT Auth → Agent Loop            │
-    │                          │                           │
-    │          ┌───────────────┼───────────────┐           │
-    │          ↓               ↓               ↓           │
-    │  search_documents  get_employee_info  apply_leave    │
-    │          │               │               │           │
-    │     Vector Store    employees.json   employees.json  │
-    │          │                                           │
-    │        Gemini LLM → Final Answer                     │
-    └───────────────────────────────────────────────────────┘
-                            │
-                    React Frontend (Vite)
-                    Chat UI + Sources + Tools
-```
-
-**Detailed Mermaid diagram:**
 
 ```mermaid
 flowchart TD
@@ -80,8 +43,8 @@ flowchart TD
         E --> V[(JSON Vector Store\nNumPy cosine similarity)]
     end
 
-    subgraph Runtime ["Runtime"]
-        FE[Frontend\nReact + Tailwind] -->|POST /chat\nBearer JWT| API[FastAPI\n/chat route]
+    subgraph Runtime ["Runtime Execution"]
+        FE[Frontend\nReact + Vite] -->|POST /chat\nBearer JWT| API[FastAPI Backend\n/chat route]
         API --> AG[Agent Loop\ngemini-2.0-flash\n+ function calling]
 
         AG -->|tool call| T1[search_company_documents]
@@ -91,7 +54,7 @@ flowchart TD
         T1 -->|embed query| E2[Gemini gemini-embedding-001]
         E2 -->|cosine search| V
         V -->|top-k chunks| T1
-        T1 -->|LLM generate| LLM[gemini-2.0-flash]
+        T1 -->|LLM generate| LLM[Gemini 2.0 Flash]
         LLM --> T1
 
         T2 --> EDB[(employees.json)]
