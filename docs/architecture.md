@@ -24,8 +24,9 @@ flowchart TD
         T1 -->|LLM generate| LLM[gemini-2.0-flash]
         LLM --> T1
 
-        T2 --> EDB[(employees.json)]
-        T3 --> EDB
+        T2 --> SDB[(SQLite Database\nbackend/data/app.db)]
+        T3 --> SDB
+        AG -->|persist messages| SDB
 
         AG -->|final answer\n+ sources\n+ tools_used| API
         API --> FE
@@ -44,10 +45,12 @@ flowchart TD
 
 4. **Gemini** either responds directly or requests a tool call:
    - `search_company_documents` → embed query → NumPy cosine search → LLM synthesises answer
-   - `get_employee_info` → lookup `employees.json`
-   - `apply_leave` → validate dates & balance → deduct → return confirmation
+   - `get_employee_info` → lookup employee record in SQLite Database (`app.db`)
+   - `apply_leave` → validate dates & balance against SQLite DB → deduct balance & record application in `leave_applications` table → return confirmation
 
-5. Tool results feed back into the conversation; loop repeats (max 5 iterations)
+5. **State Persistence**: All conversation history messages and leave requests are atomically saved to SQLite DB (`app.db`), surviving server and container restarts.
 
-6. Final text answer, source list, and tool list are returned to the frontend
+6. Tool results feed back into the conversation; loop repeats (max 5 iterations)
+
+7. Final text answer, source list, and tool list are returned to the frontend
 

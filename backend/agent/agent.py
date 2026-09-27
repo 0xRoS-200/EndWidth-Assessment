@@ -17,6 +17,7 @@ from google.generativeai.types import FunctionDeclaration, Tool
 
 from config import GEMINI_API_KEY, GEMINI_MODEL
 from tools.tools import TOOL_REGISTRY, TOOL_DESCRIPTIONS
+from database.db import save_chat_message, get_session_history, clear_session_history
 from logger import get_logger
 
 log = get_logger("agent")
@@ -32,6 +33,9 @@ RETRY_DELAY = 25  # seconds to wait on 429
 _history: dict = defaultdict(list)
 
 
+_CACHED_TOOLS = None
+
+
 def _build_tools() -> list:
     """Convert our tool description dicts into Gemini FunctionDeclaration objects."""
     declarations = []
@@ -44,6 +48,13 @@ def _build_tools() -> list:
             )
         )
     return [Tool(function_declarations=declarations)]
+
+
+def _get_tools() -> list:
+    global _CACHED_TOOLS
+    if _CACHED_TOOLS is None:
+        _CACHED_TOOLS = _build_tools()
+    return _CACHED_TOOLS
 
 
 def _build_system_prompt(employee_id: str) -> str:
@@ -94,12 +105,17 @@ def chat(employee_id: str, message: str, session_id: str) -> dict:
     """
     log.info("chat() | session=%s | emp=%s | msg=%r", session_id[:8], employee_id, message[:80])
 
-    tools = _build_tools()
+    tools = _get_tools()
     model = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         tools=tools,
         system_instruction=_build_system_prompt(employee_id),
     )
+
+    try:
+        save_chat_message(session_id, employee_id, "user", message)
+    except Exception as e:
+        log.warning("Failed to save user chat message to DB: %s", e)
 
     _history[session_id].append({"role": "user", "parts": [message]})
     _trim_history(session_id)
@@ -153,6 +169,11 @@ def chat(employee_id: str, message: str, session_id: str) -> dict:
     _history[session_id].append({"role": "model", "parts": [final_answer]})
     _trim_history(session_id)
 
+    try:
+        save_chat_message(session_id, employee_id, "model", final_answer)
+    except Exception as e:
+        log.warning("Failed to save model chat message to DB: %s", e)
+
     return {
         "answer": final_answer,
         "sources": list(set(all_sources)),
@@ -176,12 +197,17 @@ def chat_stream(employee_id: str, message: str, session_id: str):
     """
     log.info("chat_stream() | session=%s | emp=%s | msg=%r", session_id[:8], employee_id, message[:80])
 
-    tools = _build_tools()
+    tools = _get_tools()
     model = genai.GenerativeModel(
         model_name=GEMINI_MODEL,
         tools=tools,
         system_instruction=_build_system_prompt(employee_id),
     )
+
+    try:
+        save_chat_message(session_id, employee_id, "user", message)
+    except Exception as e:
+        log.warning("Failed to save user chat stream message to DB: %s", e)
 
     _history[session_id].append({"role": "user", "parts": [message]})
     _trim_history(session_id)
@@ -244,6 +270,11 @@ def chat_stream(employee_id: str, message: str, session_id: str):
     _history[session_id].append({"role": "model", "parts": [final_answer]})
     _trim_history(session_id)
 
+    try:
+        save_chat_message(session_id, employee_id, "model", final_answer)
+    except Exception as e:
+        log.warning("Failed to save model chat stream message to DB: %s", e)
+
     # Stream the answer word-by-word
     words = final_answer.split(" ")
     for i, word in enumerate(words):
@@ -262,3 +293,7 @@ def clear_session(session_id: str):
     """Clear conversation history for a session."""
     log.info("Clearing session: %s", session_id[:8])
     _history.pop(session_id, None)
+    try:
+        clear_session_history(session_id)
+    except Exception as e:
+        log.warning("Failed to clear session from DB: %s", e)

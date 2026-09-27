@@ -88,6 +88,11 @@ class TestApplyLeave:
         assert result["status"] == "failure"
         assert "End date" in result["message"]
 
+    def test_past_date_returns_failure(self):
+        result = apply_leave("EMP001", "2020-01-01", "2020-01-05", "Past trip")
+        assert result["status"] == "failure"
+        assert "past dates" in result["message"]
+
     def test_invalid_date_format_returns_failure(self):
         result = apply_leave("EMP001", "01-10-2026", "03-10-2026", "Trip")
         assert result["status"] == "failure"

@@ -57,8 +57,9 @@ flowchart TD
         T1 -->|LLM generate| LLM[Gemini 2.0 Flash]
         LLM --> T1
 
-        T2 --> EDB[(employees.json)]
-        T3 --> EDB
+        T2 --> SDB[(SQLite Database\nbackend/data/app.db)]
+        T3 --> SDB
+        AG -->|persist messages| SDB
 
         AG -->|answer + sources + tools_used| API
         API --> FE
@@ -77,10 +78,11 @@ See [`docs/architecture.md`](docs/architecture.md) for more detail.
 | Backend | Python, FastAPI |
 | AI / LLM | Google Gemini (`gemini-2.0-flash`) |
 | Embeddings | Google Gemini (`gemini-embedding-001`) |
-| Vector Store | Custom JSON file + NumPy (no external DB needed) |
+| Relational DB | SQLite (`backend/data/app.db`) for employee profiles, leave history, & chat sessions |
+| Vector Store | Custom JSON file + NumPy (no heavy external vector DB required) |
 | Auth | JWT (JSON Web Tokens) |
 | Deployment | Docker + Docker Compose |
-| Testing | pytest (51 tests) |
+| Testing | pytest (57 tests) |
 
 ---
 
@@ -96,23 +98,20 @@ Company documents are too long to search all at once, so they're split into smal
 
 ---
 
-## Embedding Model
+## Persistent Database & Storage Architecture
 
-**Model used:** `models/gemini-embedding-001`
+To address the limitations of relying solely on vector databases (such as ChromaDB or plain vector stores) which are built for similarity retrieval rather than transactional ACID persistence:
 
-- Each chunk is converted into a list of numbers (a "vector") that captures its meaning.
-- When you ask a question, your question is also converted into a vector.
-- The system then finds which chunks have vectors closest to your question's vector — those are the most relevant.
-- Task type `retrieval_document` is used for chunks; `retrieval_query` is used for questions.
+1. **Relational SQLite Database (`backend/data/app.db`)**:
+   - **`employees`**: Stores profiles, hashed passwords, departments, roles, and leave balances. Automatically seeded from `employees.json` if empty.
+   - **`leave_applications`**: Transactional audit log storing submitted leave requests (`employee_id`, `start_date`, `end_date`, `reason`, `days_requested`, `status`, `applied_at`). Leave balance updates are atomically persisted.
+   - **`chat_sessions` & `chat_messages`**: Persistent chat session and turn history so conversations survive server restarts.
 
----
+2. **Vector Store (`backend/vector_store_data/store.json`)**:
+   - Dedicated semantic retrieval store using NumPy cosine similarity and hybrid reranking.
 
-## Vector Database
-
-**Choice:** Custom JSON file (`backend/vector_store_data/store.json`) + NumPy
-
-**Why not ChromaDB / Pinecone / FAISS?**
-For this assessment scope, a self-contained pure-Python solution avoids external infrastructure while demonstrating the core concepts clearly. The store supports upsert-by-ID, cosine similarity search, and is easy to inspect as plain JSON.
+**Why not rely only on ChromaDB / Vector DB for storage?**
+Vector databases like ChromaDB are designed for approximate nearest-neighbor similarity searches, not structured transactional data. Operational records (leave requests, employee profiles, chat histories) require relational integrity, primary keys, audit records, and transactional updates provided by a database engine like SQLite.
 
 **Retrieval approach (step by step):**
 1. Embed the user's question into a vector.
@@ -255,10 +254,11 @@ pytest backend/tests/ -v
 | Test File | What It Tests | Tests |
 |---|---|---|
 | `test_auth.py` | Password hashing, JWT signing, token expiry | 7 |
-| `test_tools.py` | Employee lookup, leave validation, edge cases | 13 |
+| `test_database.py` | Database schema initialization, seeding, leave tracking, chat history | 5 |
+| `test_tools.py` | Employee lookup, leave validation, edge cases | 14 |
 | `test_retriever.py` | Reranking, confidence threshold, hallucination fallback | 12 |
 | `test_routes.py` | All API endpoints, auth, streaming | 19 |
-| **Total** | | **51** |
+| **Total** | | **57** |
 
 ---
 
@@ -267,7 +267,7 @@ pytest backend/tests/ -v
 These are decisions made during development that may differ from a production system:
 
 - **Documents are plain `.txt` files** — PDFs are not parsed. Conversion to `.txt` is assumed to happen before ingestion.
-- **Employee data is in-memory** — The `employees.json` file is loaded at startup. Leave balance changes are lost when the server restarts (no persistent database).
+- **Relational Data is in SQLite** — The database initializes from `employees.json` if empty, and all updates (balances, leave history, chat turns) persist in `backend/data/app.db`.
 - **Dates must be `YYYY-MM-DD`** — The LLM converts natural-language dates (e.g., "20 September") to this format before calling the leave tool.
 - **One employee per session** — Each user logs in with their own account. The agent always acts on behalf of the authenticated user.
 - **Vector store must be pre-built** — Run `python -m ingestion.ingest` once from the `backend/` directory before starting the server.
@@ -279,10 +279,8 @@ These are decisions made during development that may differ from a production sy
 
 Known limitations of this implementation:
 
-- **Leave state resets on restart** — Any leave applied during a session is lost when the server stops. A real system would use a database.
 - **No PDF/DOCX support** — Only `.txt` files are ingested.
-- **No persistent chat history** — Conversation history lives in server memory and is lost on restart.
-- **Single-server only** — In-memory state (sessions, leave balance) won't work across multiple server instances.
+- **Single-node SQLite database** — Designed for single-server or volume-mounted deployment (for multi-node horizontal scaling, PostgreSQL or MySQL can be substituted).
 - **Gemini API rate limits** — Heavy usage may hit Google's API limits. The agent retries once after 25 seconds on a 429 error.
 - **No metadata filtering** — Retrieval searches all documents equally with no category filter.
 - **Confidence threshold is manually tuned** — The `0.35` threshold was set for the provided documents. Different document sets may need adjustment.

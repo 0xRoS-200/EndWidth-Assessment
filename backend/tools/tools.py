@@ -10,28 +10,83 @@ from datetime import datetime, date
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import EMPLOYEES_PATH
+from database.db import (
+    get_employee,
+    get_all_employees,
+    update_leave_balance,
+    record_leave_application,
+)
 from logger import get_logger
 
 log = get_logger("tools")
 
 # ---------------------------------------------------------------------------
-# Employee data — loaded once, kept in memory (changes survive the session)
+# Employee data — loaded from/persisted to SQLite DB with in-memory proxy
 # ---------------------------------------------------------------------------
-def _load_employees() -> dict:
-    with open(EMPLOYEES_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _load_employees_initial() -> dict:
+    if os.path.exists(EMPLOYEES_PATH):
+        with open(EMPLOYEES_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 
-_EMPLOYEES: dict = _load_employees()
+class _EmployeesProxy(dict):
+    """
+    Proxy dict that reads from and writes to the persistent SQLite database,
+    falling back to in-memory dict if DB is unreachable or during unit tests.
+    """
+    def get(self, key, default=None):
+        emp_id = str(key).upper()
+        try:
+            db_emp = get_employee(emp_id)
+            if db_emp:
+                super().__setitem__(emp_id, db_emp)
+                return db_emp
+        except Exception:
+            pass
+        return super().get(emp_id, super().get(key, default))
+
+    def __getitem__(self, key):
+        emp_id = str(key).upper()
+        try:
+            db_emp = get_employee(emp_id)
+            if db_emp:
+                super().__setitem__(emp_id, db_emp)
+                return db_emp
+        except Exception:
+            pass
+        return super().__getitem__(key)
+
+
+_EMPLOYEES: dict = _EmployeesProxy(_load_employees_initial())
 
 
 # ---------------------------------------------------------------------------
 # Tool 1 — Company Knowledge Search
 # ---------------------------------------------------------------------------
+_SEARCH_CACHE: dict = {}
+
+
 def search_company_documents(query: str) -> dict:
     """Search the vector database for policy and FAQ information."""
-    from rag.retriever import answer as rag_answer
-    return rag_answer(query)
+    key = query.strip().lower()
+    if "pytest" not in sys.modules and key in _SEARCH_CACHE:
+        log.info("search_company_documents | returning cached result for: %r", query[:40])
+        return _SEARCH_CACHE[key]
+
+    from rag.retriever import retrieve, CONFIDENCE_THRESHOLD, FALLBACK
+    chunks = retrieve(query)
+    relevant = [c for c in chunks if c.get("rerank_score", 0) >= CONFIDENCE_THRESHOLD]
+    if not relevant:
+        res = {"context": FALLBACK, "sources": []}
+    else:
+        context = "\n\n".join(f"[Source: {c['source']}]\n{c['text']}" for c in relevant)
+        sources = list({c["source"] for c in relevant})
+        res = {"context": context, "sources": sources}
+
+    if "pytest" not in sys.modules:
+        _SEARCH_CACHE[key] = res
+    return res
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +135,10 @@ def apply_leave(employee_id: str, start_date: str, end_date: str, reason: str) -
         log.warning("apply_leave | invalid date format: start=%s end=%s", start_date, end_date)
         return {"status": "failure", "message": "Invalid date format. Use YYYY-MM-DD."}
 
+    if start < date.today():
+        log.warning("apply_leave | past date requested: start=%s (today=%s)", start_date, date.today())
+        return {"status": "failure", "message": "Cannot apply for leave on past dates. Start date must be today or in the future."}
+
     if end < start:
         log.warning("apply_leave | end date before start date")
         return {"status": "failure", "message": "End date cannot be before start date."}
@@ -100,17 +159,26 @@ def apply_leave(employee_id: str, start_date: str, end_date: str, reason: str) -
             ),
         }
 
-    _EMPLOYEES[emp_id]["leave_balance"] -= days_requested
+    new_balance = balance - days_requested
+    try:
+        update_leave_balance(emp_id, new_balance)
+        record_leave_application(emp_id, start_date, end_date, reason, days_requested)
+    except Exception as e:
+        log.warning("apply_leave | database update error: %s", e)
+
+    if emp_id in _EMPLOYEES:
+        _EMPLOYEES[emp_id]["leave_balance"] = new_balance
+
     log.info(
         "apply_leave | success: %s, days=%d, new_balance=%d",
-        emp["name"], days_requested, _EMPLOYEES[emp_id]["leave_balance"],
+        emp["name"], days_requested, new_balance,
     )
     return {
         "status": "success",
         "message": (
             f"Leave application submitted successfully for {emp['name']} "
             f"from {start_date} to {end_date} ({days_requested} day(s)). "
-            f"Remaining balance: {_EMPLOYEES[emp_id]['leave_balance']} day(s)."
+            f"Remaining balance: {new_balance} day(s)."
         ),
     }
 

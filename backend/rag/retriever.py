@@ -87,6 +87,37 @@ def rerank(query: str, chunks: list[dict]) -> list[dict]:
     return reranked
 
 
+_STORE_CACHE = None
+_EMBEDDING_CACHE: dict = {}
+
+
+def _get_vector_store():
+    global _STORE_CACHE
+    if "pytest" in sys.modules:
+        return VectorStore(VECTOR_STORE_PATH)
+    if _STORE_CACHE is None:
+        _STORE_CACHE = VectorStore(VECTOR_STORE_PATH)
+    return _STORE_CACHE
+
+
+def _get_embedding(query: str) -> list:
+    """Return cached embedding if available, otherwise fetch from Gemini API."""
+    key = query.strip().lower()
+    if "pytest" not in sys.modules and key in _EMBEDDING_CACHE:
+        log.debug("Using cached embedding for query: %r", query[:40])
+        return _EMBEDDING_CACHE[key]
+
+    result = genai.embed_content(
+        model=EMBEDDING_MODEL,
+        content=query,
+        task_type="retrieval_query",
+    )
+    embedding = result["embedding"]
+    if "pytest" not in sys.modules:
+        _EMBEDDING_CACHE[key] = embedding
+    return embedding
+
+
 # ---------------------------------------------------------------------------
 # Retrieval
 # ---------------------------------------------------------------------------
@@ -94,14 +125,9 @@ def retrieve(query: str, top_k: int = TOP_K) -> list[dict]:
     """Embed the query, search the vector store, rerank, and return top chunks."""
     log.info("Retrieving chunks for query: %r", query[:80])
 
-    result = genai.embed_content(
-        model=EMBEDDING_MODEL,
-        content=query,
-        task_type="retrieval_query",
-    )
-    query_embedding = result["embedding"]
+    query_embedding = _get_embedding(query)
 
-    store = VectorStore(VECTOR_STORE_PATH)
+    store = _get_vector_store()
     results = store.query(query_embedding=query_embedding, n_results=top_k)
 
     chunks = []
